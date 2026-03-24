@@ -579,7 +579,7 @@ class MegatronLMEval(LM):
             self._model = get_model(model_provider, wrap_with_ddp=False)
 
             # Load checkpoint
-            load_checkpoint(self._model, None, None, strict=True)
+            load_checkpoint(self._model, None, None, strict=False)
 
             # Extract single model (no virtual pipeline parallelism)
             assert len(self._model) == 1, f"Expected 1 model, got {len(self._model)}"
