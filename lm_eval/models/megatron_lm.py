@@ -517,9 +517,20 @@ class MegatronLMEval(LM):
                 # mask internally. Without this, padding tokens can remain visible (especially with
                 # left-padding / batched inference), which leads to incorrect attention and wrong
                 # inference results.
+                #
+                # Only apply to standard Attention modules — alternative attention variants
+                # (e.g. GatedDeltaNet) don't accept attn_mask_type.
+                from megatron.core.transformer.attention import Attention
                 from megatron.core.transformer.enums import (  # pylint: disable=import-error
                     AttnMaskType,
                 )
+
+                def _is_attention_module(spec):
+                    module_cls = getattr(spec, "module", None)
+                    return (
+                        isinstance(module_cls, type)
+                        and issubclass(module_cls, Attention)
+                    )
 
                 try:
                     updated = 0
@@ -530,10 +541,11 @@ class MegatronLMEval(LM):
                         "self_attention",
                         None,
                     )
-                    params = getattr(self_attention, "params", None)
-                    if isinstance(params, dict):
-                        params["attn_mask_type"] = AttnMaskType.arbitrary
-                        updated += 1
+                    if self_attention is not None and _is_attention_module(self_attention):
+                        params = getattr(self_attention, "params", None)
+                        if isinstance(params, dict):
+                            params["attn_mask_type"] = AttnMaskType.arbitrary
+                            updated += 1
 
                     # Decoder block spec (list of layer specs).
                     layer_specs = getattr(transformer_layer_spec, "layer_specs", None)
@@ -544,14 +556,15 @@ class MegatronLMEval(LM):
                                 "self_attention",
                                 None,
                             )
-                            layer_params = getattr(layer_self_attention, "params", None)
-                            if isinstance(layer_params, dict):
-                                layer_params["attn_mask_type"] = AttnMaskType.arbitrary
-                                updated += 1
+                            if layer_self_attention is not None and _is_attention_module(layer_self_attention):
+                                layer_params = getattr(layer_self_attention, "params", None)
+                                if isinstance(layer_params, dict):
+                                    layer_params["attn_mask_type"] = AttnMaskType.arbitrary
+                                    updated += 1
 
                     if updated == 0:
                         eval_logger.warning(
-                            "No self_attention params found to override attn_mask_type; "
+                            "No standard Attention modules found to override attn_mask_type; "
                             "proceeding with original spec defaults."
                         )
                 except Exception as e:
