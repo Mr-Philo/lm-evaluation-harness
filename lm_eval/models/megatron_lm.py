@@ -459,6 +459,9 @@ class MegatronLMEval(LM):
                     get_gpt_layer_local_spec,
                     get_gpt_layer_with_transformer_engine_spec,
                 )
+                from megatron.core.models.gpt.experimental_attention_variant_module_specs import (
+                    get_transformer_block_with_experimental_attention_variant_spec,
+                )
                 from megatron.core.models.gpt.heterogeneous.heterogeneous_layer_specs import (
                     get_gpt_heterogeneous_layer_spec,
                 )
@@ -471,7 +474,13 @@ class MegatronLMEval(LM):
                 # For MoE models, use decoder block spec so each layer follows moe_layer_freq.
                 transformer_impl = getattr(args, "transformer_impl", "local")
                 use_transformer_engine = transformer_impl == "transformer_engine"
-                if args.num_experts:
+                if getattr(args, "experimental_attention_variant", None) is not None:
+                    transformer_layer_spec = (
+                        get_transformer_block_with_experimental_attention_variant_spec(
+                            config=config,
+                        )
+                    )
+                elif args.num_experts:
                     assert config.transformer_impl != "inference_optimized", (
                         "MoE is not supported with inference_optimized transformer_impl."
                     )
